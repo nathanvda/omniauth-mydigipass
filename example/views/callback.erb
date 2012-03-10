@@ -1,0 +1,14 @@
+<html>
+  <body>
+    <h1>Authentication Successfull via <%= @auth.provider %></h1>
+    <h2>info:</h2>
+    <ul>
+      <%- @auth.info.each do |key, value| %>
+        <li><strong><%= key %>:</strong> <%= value.inspect %></li>
+      <% end %>
+    </ul>
+    <a href='/'>Sign out</a>
+    <h2>raw auth:</h2>
+    <pre style="white-space: pre-wrap"><%= Rack::Utils.escape_html @auth.inspect %></pre>
+  </body>
+</html>
