@@ -22,7 +22,61 @@ Once your application goes in production, you can just write:
       provider :mydigipass, ENV['MYDIGIPASS_CLIENT_ID'], ENV['MYDIGIPASS_CLIENT_SECRET']
     end
 
+## Example Application
 
+I have added a small working example application, check it out how it should work. To integrate into rails you should
+
+* add the
+
+## Example Integrating with Rails
+
+Inside your `config/application.rb` add the following (e.g. at the bottom, inside the configuration block) :
+
+    # enable omniauth strategies
+    Rails.application.config.middleware.use OmniAuth::Builder do
+      provider :mydigipass, APP_CONFIG[:client_id], APP_CONFIG[:client_secret]
+    end
+
+And then you just have to make sure you have something listening at `/auth/:provider/callback`.
+Suppose you add the following routes:
+
+  match '/auth/:provider/callback', :to => 'home#auth_create'
+  match '/auth/failure', :to => 'home#auth_failure'
+
+Then, inside your `HomeController` you could write:
+
+    def auth_failure
+      set_flash_message(:notice, "OAuth error: #{params[:message]}")
+      redirect_to root_path
+    end
+
+    def auth_create
+      user = User.find_or_create_from_auth_hash(request.env['omniauth.auth'].with_indifferent_access)
+      logger.debug "Found or created user: #{user.email} [#{user.id}]"
+      if user.sign_in_count == 0
+        set_flash_message(:notice, "Welcome #{user.email}, thank you for signing up using your dP+ account!")
+      else
+        set_flash_message(:notice, "Succesfully logged in!")
+      end
+      sign_in(:user, user, :bypass => true)
+      redirect_to dashboard_path
+    end
+
+When a user signs in through MYDIGIPASS.COM, it could be a new user (signing up), or an existing user.
+The function `find_or_create_from_auth_hash` handles that for me:
+
+    def self.from_auth_hash(auth_hash)
+      logger.debug "User.from_auth_hash: auth_hash = #{auth_hash.inspect} "
+      received_uuid = auth_hash[:extra][:raw_info][:uuid]
+      received_email = auth_hash[:extra][:raw_info][:email]
+
+      user = User.find_by_uuid(received_uuid) || User.find_by_email(received_email)
+      user = user.nil? ? create_from_auth_hash(received_uuid, received_email) : prevent_login_with_normal_password(user, received_uuid)
+    end
+
+I try to find the user, by `uuid` or `email`. If I find the user by `uuid`, she has logged on before with MYDIGIPASS.COM
+If I find a matching mail, link the uuid to that user. If I do not find a user, create one with the given `email` and `uuid`.
+I also made sure that users can then only login with their MYDIGIPASS.COM and no longer normally, but that is optional of course.
 
 ## License
 
